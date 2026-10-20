@@ -59,7 +59,12 @@ Repository secrets: `DOCKER_HUB_TOKEN` (read and write) and `SLACK_WEBHOOK`. The
 
 ## Run it locally
 
-Prerequisite: Docker Desktop with Kubernetes enabled. Nothing else is needed; the script installs kubectl, Node.js 20+ and Pulumi if they are missing.
+Prerequisites:
+
+- Docker Desktop with Kubernetes enabled (the `docker-desktop` context).
+- A macOS or Linux terminal with `bash` and `curl`. The scripts do not run in native Windows (PowerShell or `cmd`). On Windows use WSL2 with Docker Desktop's WSL integration enabled and run the scripts from inside WSL; this is untested.
+
+Nothing else is needed; the script installs kubectl, Node.js 20+ and Pulumi if they are missing. It has only been run on macOS (Apple Silicon).
 
 ```sh
 ./scripts/bootstrap.sh            # install, deploy, wait until the app answers
