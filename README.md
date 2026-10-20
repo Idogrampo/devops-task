@@ -48,6 +48,10 @@ Installed by the same Pulumi stack, sized for a laptop (no Alertmanager, 6 h of 
 
 Runs on GitHub-hosted runners (`ubuntu-latest`).
 
+**What triggers it.** Only changes that can affect the artifacts: `app.js`, `package*.json`, `Dockerfile`, `.dockerignore`, `test/`, `helm/`, `actions/` and the workflow itself. README, docs, Pulumi, monitoring and script changes do not run the pipeline.
+
+**What gets rebuilt.** The image tag is `sha-<last commit that changed an image input>`, so a chart-only change reuses the existing image. If that tag is already on Docker Hub, build, scan and push are skipped. A new chart version is published only when the image inputs or `helm/` changed; otherwise the run just re-checks tests and security gates.
+
 1. **Lint and test**: `npm test`, `helm lint`, `helm template`.
 2. **SAST**: Semgrep (JavaScript, Node.js and Dockerfile rules); fails on any ERROR finding. `npm audit` fails on critical advisories.
 3. **Version**: SemVer from the last `vX.Y.Z` tag. A `feat` commit bumps minor, `!:` or `BREAKING CHANGE` bumps major, anything else bumps patch. Pull requests get a throwaway `0.0.0-pr<N>` that is never published.
