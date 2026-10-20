@@ -28,7 +28,18 @@ A small Express app with Prometheus metrics and health endpoints, packaged as a 
 
 **Deployment, not StatefulSet.** The app is stateless: replicas are interchangeable and need no stable identity, ordered startup or persistent storage. A Deployment with a rolling update (`maxUnavailable: 0`) fits.
 
-**Helm chart.** Readiness, liveness and startup probes, resource requests and limits, a ConfigMap (with a checksum annotation so config changes roll the pods), an optional Secret, a Service, a PodDisruptionBudget and an optional HPA. Pods run as non-root with a read-only root filesystem and all capabilities dropped. Traffic enters through an Istio `VirtualService`; a plain `Ingress` template is included but disabled by default.
+**Helm chart.** Readiness, liveness and startup probes, resource requests and limits, a ConfigMap (with a checksum annotation so config changes roll the pods), an optional Secret, a Service, a PodDisruptionBudget and KEDA autoscaling (see below). Pods run as non-root with a read-only root filesystem and all capabilities dropped. Traffic enters through an Istio `VirtualService`; a plain `Ingress` template is included but disabled by default.
+
+**Autoscaling: KEDA, not a plain CPU HPA.** The chart ships a KEDA `ScaledObject` that scales the Deployment between 2 and 6 replicas. KEDA creates and manages the HPA itself (the one in the k9s screenshots below), so there is nothing else to configure. Each trigger asks for a replica count and the largest wins:
+
+| Trigger | Source | Threshold |
+|---|---|---|
+| CPU | metrics-server, app container only (the Istio sidecar is excluded) | 80% of requests |
+| Memory | metrics-server, app container only | 80% of requests |
+| Request rate | Prometheus, `root_access_total` | 5 req/s per replica |
+| Latency | Prometheus, Istio p95 of requests that arrive through the ingress gateway | 100 ms, only counted above 1 req/s |
+
+I used KEDA because a plain HPA can only scale on CPU and memory, while KEDA can also scale on Prometheus and Istio metrics that reflect real load. The latency trigger needs the Istio sidecar, which Pulumi enables by labelling the app namespace for injection, and a PodMonitor so Prometheus scrapes the Envoy proxies. Prometheus scrapes and probes are deliberately excluded from the latency measurement, because they would otherwise dominate it at idle. The plain `autoscaling` (CPU HPA) values are still in the chart as an alternative for clusters without KEDA; the chart refuses to enable both. Under a local load test the app scaled from 2 to 6 replicas and back. Because the app answers in about 1 ms, the latency trigger rarely fires on its own.
 
 **GitOps: ArgoCD pulls manifests directly from the app repository** (option 2 of the two on offer). The `Application` (`argocd/application.yaml`) points at `helm/devops-task` on `main`, with the environment values in `helm/devops-task/values-local.yaml`. I chose it over a separate GitOps repository because this is a single service: one repository means one set of access rules, one pull request for a code and chart change together, and nothing to keep in sync. The trade-off is that deploy commits share history with code, which is fine here and is why the bot commit below carries `[skip ci]`. Git is the source of truth for what runs: after each image build CI commits the new `image.tag` to `values-local.yaml`, ArgoCD notices the commit (polling every 3 minutes by default) and syncs it, and a rollback is a `git revert`. ArgoCD auto-syncs with `prune` and `selfHeal`, so manual changes in the cluster are reverted.
 
