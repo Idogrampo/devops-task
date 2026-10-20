@@ -79,7 +79,7 @@ Repository secrets: `DOCKER_HUB_TOKEN` (read and write) and `SLACK_WEBHOOK`. The
 Prerequisites:
 
 - Docker Desktop with Kubernetes enabled (the `docker-desktop` context) and **at least 12 GB of memory and 6 CPUs** allocated to it (Settings, Resources). The full stack (Istio, ArgoCD, Prometheus, Grafana, Loki, KEDA and the app with sidecars) uses about 6.5 GB at idle. On an 8 GB VM it runs but sits at about 90% memory, and under load probes time out and pods restart.
-- A macOS or Linux terminal with `bash` and `curl`. The scripts do not run in native Windows (PowerShell or `cmd`). On Windows use WSL2 with Docker Desktop's WSL integration enabled and run the scripts from inside WSL; this is untested.
+- A macOS or Linux terminal with `bash` and `curl`. The scripts do not run in native Windows (PowerShell or `cmd`).
 
 Nothing else is needed; the script installs kubectl, Node.js 20+ and Pulumi if they are missing. It has only been run on macOS (Apple Silicon).
 
@@ -173,4 +173,4 @@ PORT=8080 node app.js
 
 ## Tested on
 
-macOS (Apple Silicon) with Docker Desktop and its built-in Kubernetes (v1.30). Linux is expected to work but has not been tested, and Windows is only expected to work through WSL2 (see Prerequisites).
+macOS (Apple Silicon) with Docker Desktop and its built-in Kubernetes (v1.30). Linux is expected to work but has not been tested.
