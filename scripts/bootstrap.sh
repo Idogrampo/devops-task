@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # One-shot setup for a machine that only has Docker Desktop with Kubernetes enabled.
-# Installs missing tooling, then runs the Pulumi stack, which deploys Istio, ArgoCD and the app.
+# Installs missing tooling, then runs the Pulumi stack, which deploys Istio, ArgoCD, the monitoring
+# stack (Prometheus, Grafana, Loki) and the app.
 #
 #   ./scripts/bootstrap.sh              install tooling, deploy, wait until the app answers
 #   ./scripts/bootstrap.sh --dry-run    same, but only `pulumi preview`
@@ -14,6 +15,7 @@ STACK=local
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BACKEND="${PULUMI_LOCAL_BACKEND:-file://$HOME/.pulumi-local}"
 HOST=devops-task.localhost
+GRAFANA_HOST=grafana.localhost
 DRY_RUN=0; RESET=0
 for a in "$@"; do
   case "$a" in
@@ -89,7 +91,7 @@ if [ "$DRY_RUN" = 1 ]; then
   pulumi preview --non-interactive
   exit 0
 fi
-log "Deploying Istio, ArgoCD and the app (first run takes a few minutes)"
+log "Deploying Istio, ArgoCD, monitoring and the app (first run takes several minutes)"
 pulumi up --yes --non-interactive --skip-preview
 
 log "Waiting for ArgoCD to sync and the app to become healthy"
@@ -111,11 +113,21 @@ done
 [ -n "${out:-}" ] || die "gateway did not answer on localhost:80 (is another process using port 80?)"
 echo "  response: $out"
 
+log "Checking Grafana at http://$GRAFANA_HOST"
+for i in $(seq 1 30); do
+  g=$(curl -fsS -m 5 --resolve "$GRAFANA_HOST:80:127.0.0.1" "http://$GRAFANA_HOST/api/health" 2>/dev/null || true)
+  [ -n "$g" ] && break
+  sleep 5
+done
+[ -n "${g:-}" ] && echo "  grafana: $g" || echo "  warning: Grafana did not answer yet; check: kubectl --context $CTX -n monitoring get pods"
+
 pw=$(kubectl --context "$CTX" -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)
 cat <<MSG
 
 Done.
   App:     http://$HOST/my-app
+  Grafana: http://$GRAFANA_HOST   user: admin   password: admin   (dashboard: "devops-task")
+  Prometheus: http://prometheus.localhost
   ArgoCD:  kubectl --context $CTX -n argocd port-forward svc/argocd-server 8081:80   ->  http://localhost:8081
            user: admin   password: $pw
 MSG

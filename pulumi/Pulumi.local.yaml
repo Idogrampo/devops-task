@@ -8,6 +8,8 @@ config:
   # Semver constraint: ArgoCD follows the newest chart CI pushes. Pin to e.g. 1.0.3 to freeze.
   devops-task-local:chartVersion: ">=0.0.1"
   devops-task-local:appHost: devops-task.localhost
+  devops-task-local:grafanaHost: grafana.localhost
+  devops-task-local:prometheusHost: prometheus.localhost
   devops-task-local:istioVersion: 1.26.4
   # Only for private Docker Hub repos: DOCKER_HUB_TOKEN=... ./scripts/bootstrap.sh
 encryptionsalt: v1:GK85mMYEnUc=:v1:TrFlnL1D+bb+hWt2:VP6rKNa5u11okVMGY5rr9Lc+PHXhDg==

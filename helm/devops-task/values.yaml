@@ -88,6 +88,12 @@ metrics:
   scrape: true
   path: /metrics
 
+# Needs the Prometheus Operator CRDs (kube-prometheus-stack); off by default
+monitoring:
+  serviceMonitor:
+    enabled: false
+    interval: 15s
+
 autoscaling:
   enabled: false
   minReplicas: 2

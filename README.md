@@ -19,7 +19,8 @@ A small Express app with Prometheus metrics and health endpoints, packaged as a 
 | `helm/devops-task/` | Helm chart |
 | `.github/workflows/cicd.yml` | CI/CD pipeline |
 | `actions/send_slack/` | Slack notification action (incoming webhook) |
-| `pulumi/` | Pulumi program that installs Istio and ArgoCD and declares the ArgoCD `Application` |
+| `pulumi/` | Pulumi program that installs Istio, ArgoCD and the monitoring stack and declares the ArgoCD `Application` |
+| `monitoring/` | Grafana dashboard for the app (provisioned by Pulumi as a ConfigMap) |
 | `scripts/` | `bootstrap.sh` and `teardown.sh` for a local cluster |
 
 ## Design decisions
@@ -33,6 +34,15 @@ A small Express app with Prometheus metrics and health endpoints, packaged as a 
 **Pulumi only bootstraps.** It installs Istio (base, istiod, ingress gateway), ArgoCD and a platform-owned `Gateway`, then declares one ArgoCD `Application`. After that, every deploy is a chart push by CI. The stack is pinned to the `docker-desktop` context and refuses any other, and its state lives in a local file backend (`~/.pulumi-local`).
 
 **Git workflow: trunk-based.** Pull requests run every gate but publish nothing. Pushes to `main` publish and release.
+
+## Monitoring
+
+Installed by the same Pulumi stack, sized for a laptop (no Alertmanager, 6 h of metrics, 24 h of logs, nothing persisted).
+
+- **Metrics:** kube-prometheus-stack (Prometheus, Grafana, kube-state-metrics). The chart ships a `ServiceMonitor` (enabled by the ArgoCD `Application`), so Prometheus scrapes `/metrics` inside the cluster even though the gateway does not expose it.
+- **Logs:** Loki in single-binary mode, fed by Grafana Alloy, which tails every pod's logs through the Kubernetes API (no hostPath mounts, so it works on Docker Desktop).
+- **Dashboard:** `devops-task` in Grafana: ready replicas, request rate and total hits (`root_access_total`), CPU, memory, restarts, Node.js event loop lag, heap and GC, plus a live log panel. Grafana loads it from a ConfigMap labelled `grafana_dashboard=1`.
+- **Access:** http://grafana.localhost (user `admin`, password `admin`, local only; override with `pulumi config set --secret grafanaAdminPassword ...`) and http://prometheus.localhost, both through the Istio gateway.
 
 ## CI/CD pipeline
 
@@ -63,7 +73,7 @@ When it finishes:
 - App: http://devops-task.localhost/my-app
 - ArgoCD: `kubectl --context docker-desktop -n argocd port-forward svc/argocd-server 8081:80`, then http://localhost:8081 (user `admin`, password printed by the script)
 
-The gateway uses `localhost:80`, so that port must be free. The Docker Hub repository is public. If you use a private one, export `DOCKER_HUB_TOKEN` before running the script and it creates the ArgoCD repository credential and the image pull secret.
+The first run pulls a lot of images and takes several minutes. The gateway uses `localhost:80`, so that port must be free. The Docker Hub repository is public. If you use a private one, export `DOCKER_HUB_TOKEN` before running the script and it creates the ArgoCD repository credential and the image pull secret.
 
 ## Local development
 

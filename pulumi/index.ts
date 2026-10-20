@@ -1,5 +1,6 @@
 import * as pulumi from "@pulumi/pulumi";
 import * as k8s from "@pulumi/kubernetes";
+import { createMonitoring } from "./monitoring";
 
 const config = new pulumi.Config();
 const kubeContext = config.require("kubeContext");
@@ -13,6 +14,10 @@ const chartName = config.require("chartName");
 const chartVersion = config.require("chartVersion");
 const appHost = config.require("appHost");
 const istioVersion = config.require("istioVersion");
+const grafanaHost = config.require("grafanaHost");
+const prometheusHost = config.require("prometheusHost");
+// Local-only default; override with: pulumi config set --secret grafanaAdminPassword <value>
+const grafanaAdminPassword = config.get("grafanaAdminPassword") ?? "admin";
 
 // Never fall back to the shell's current kubectl context (those are company EKS clusters).
 if (kubeContext !== "docker-desktop") {
@@ -77,6 +82,9 @@ const argocd = new k8s.helm.v3.Release("argocd", {
     },
 }, opts);
 
+// Prometheus + Grafana + Loki. Installed before the app so the ServiceMonitor CRD exists when ArgoCD syncs.
+const monitoring = createMonitoring({ provider, gateway, grafanaHost, prometheusHost, grafanaAdminPassword });
+
 const appNs = new k8s.core.v1.Namespace("app-ns", { metadata: { name: appNamespace } }, opts);
 
 // Private Docker Hub only: lets ArgoCD pull the OCI chart and the kubelet pull the image
@@ -131,6 +139,7 @@ const app = new k8s.apiextensions.CustomResource("devops-task-app", {
                     `image:\n  repository: ${imageRepo}\n`,
                     ...(dockerHubToken ? [`imagePullSecrets:\n  - name: regcred\n`] : []),
                     `virtualService:\n  hosts:\n    - ${appHost}\n`,
+                    `monitoring:\n  serviceMonitor:\n    enabled: true\n`,
                 ].join(""),
             },
         },
@@ -140,9 +149,11 @@ const app = new k8s.apiextensions.CustomResource("devops-task-app", {
             syncOptions: ["CreateNamespace=true"],
         },
     },
-}, { provider, dependsOn: [argocd, appNs, gateway, ...credDeps] });
+}, { provider, dependsOn: [argocd, appNs, gateway, monitoring.stack, ...credDeps] });
 
 export const appUrl = `http://${appHost}/my-app`;
 export const argocdPortForward = "kubectl --context docker-desktop -n argocd port-forward svc/argocd-server 8081:80";
 export const argocdAdminPassword = "kubectl --context docker-desktop -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d";
+export const grafanaUrl = `http://${grafanaHost}`;
+export const prometheusUrl = `http://${prometheusHost}`;
 export const applicationName = app.metadata.name;
