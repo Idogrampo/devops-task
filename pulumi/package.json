@@ -2,11 +2,13 @@
     "name": "devops-task-local",
     "main": "index.ts",
     "devDependencies": {
+        "@types/js-yaml": "^4.0.9",
         "@types/node": "^22",
         "typescript": "^5.0.0"
     },
     "dependencies": {
         "@pulumi/kubernetes": "^4.32.0",
-        "@pulumi/pulumi": "^3.200.0"
+        "@pulumi/pulumi": "^3.200.0",
+        "js-yaml": "^4.3.2"
     }
 }

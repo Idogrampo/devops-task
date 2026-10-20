@@ -2,7 +2,9 @@ name: CI/CD
 
 # Trunk-based flow: PRs run every gate but publish nothing; pushes to main also
 # bump the version, push the image + Helm chart to Docker Hub and tag the release.
-# ArgoCD (running in the local cluster) pulls the new chart from Docker Hub.
+# ArgoCD (running in the local cluster) watches this repository; the gitops job commits the new
+# image tag to helm/devops-task/values-local.yaml and ArgoCD rolls it out. The OCI chart on
+# Docker Hub is a versioned release artifact; the cluster does not depend on it.
 #
 # Only changes that can affect the artifacts trigger the pipeline (README, docs, Pulumi, monitoring
 # and scripts do not). Within a run, the image is built only if its tag is not in the registry yet,
@@ -213,9 +215,36 @@ jobs:
           gh release create "v${{ needs.version.outputs.version }}" --target "$GITHUB_SHA" \
             --title "v${{ needs.version.outputs.version }}" --generate-notes
 
+  # GitOps: record the image tag in Git. ArgoCD watches the repository and rolls the app out from this commit.
+  gitops:
+    name: Update image tag in Git
+    needs: [version, build-scan-push]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Commit the new tag
+        env:
+          TAG: ${{ needs.version.outputs.image_tag }}
+        run: |
+          f=helm/devops-task/values-local.yaml
+          if grep -qE "^  tag: $TAG\$" "$f"; then echo "$TAG is already deployed in Git"; exit 0; fi
+          sed -i -E "s/^  tag: .*/  tag: $TAG/" "$f"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore(deploy): image tag $TAG [skip ci]"
+          # main may have moved while the image was building
+          for i in 1 2 3; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep 3
+          done
+          exit 1
+
   notify:
     name: Slack
-    needs: [test, sast, version, build-scan-push, chart]
+    needs: [test, sast, version, build-scan-push, gitops, chart]
     if: always() && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:

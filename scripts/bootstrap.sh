@@ -7,7 +7,7 @@
 #   ./scripts/bootstrap.sh --dry-run    same, but only `pulumi preview`
 #   ./scripts/bootstrap.sh --reset      forget local Pulumi state first (use after wiping the cluster)
 #
-# Optional env: DOCKER_HUB_TOKEN (only if the Docker Hub repos are private), SKIP_INSTALL=1
+# Optional env: SKIP_INSTALL=1 (do not install missing tools)
 set -euo pipefail
 
 CTX=docker-desktop
@@ -85,7 +85,6 @@ if [ "$RESET" = 1 ]; then
   mv "Pulumi.$STACK.yaml.bak" "Pulumi.$STACK.yaml"
 fi
 pulumi stack select "$STACK" >/dev/null 2>&1 || pulumi stack init "$STACK" >/dev/null
-[ -n "${DOCKER_HUB_TOKEN:-}" ] && pulumi config set --secret dockerHubToken "$DOCKER_HUB_TOKEN"
 
 if [ "$DRY_RUN" = 1 ]; then
   pulumi preview --non-interactive
