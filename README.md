@@ -159,3 +159,7 @@ npm ci
 npm test
 PORT=8080 node app.js
 ```
+
+## Tested on
+
+macOS (Apple Silicon) with Docker Desktop and its built-in Kubernetes (v1.30). Linux is expected to work but has not been tested, and Windows is only expected to work through WSL2 (see Prerequisites).
