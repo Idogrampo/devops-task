@@ -50,13 +50,16 @@ spec:
     {{- end }}
     {{- with .Values.keda.istioLatency }}
     {{- if .enabled }}
-    # p95 latency measured by Istio's Envoy proxies. Latency does not add up across pods, so the
-    # raw value is compared to the threshold (metricType: Value). Needs the sidecar and the Envoy PodMonitor.
+    {{- $sel := printf "reporter=%q,source_workload=%q,destination_workload_namespace=%q,destination_service_name=%q" "destination" "istio-ingressgateway" $ns (include "sample-nodejs.fullname" $) }}
+    # p95 latency of user traffic (requests that arrive through the ingress gateway) as measured by Istio.
+    # Prometheus scrapes and probes are excluded, and the value only counts above 1 req/s so a handful of
+    # requests cannot move it. Latency does not add up across pods, so the raw value is compared to the
+    # threshold (metricType: Value). Needs the sidecar and the Envoy PodMonitor.
     - type: prometheus
       metricType: Value
       metadata:
         serverAddress: {{ $server | quote }}
-        query: {{ .query | default (printf "histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{reporter=%q,destination_workload_namespace=%q,destination_service_name=%q}[1m])) by (le)) > 0 or vector(0)" "destination" $ns (include "sample-nodejs.fullname" $)) | quote }}
+        query: {{ .query | default (printf "(histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{%s}[1m])) by (le)) and on() (sum(rate(istio_requests_total{%s}[1m])) > 1)) or vector(0)" $sel $sel) | quote }}
         threshold: {{ .thresholdMs | quote }}
     {{- end }}
     {{- end }}

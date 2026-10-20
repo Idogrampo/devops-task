@@ -144,6 +144,14 @@ The Grafana password is a local-only default; override it with `pulumi config se
 
 ![k9s virtualservices](docs/screenshots/k9s-virtualservices.png)
 
+**KEDA scale-out under load: 6 replicas, each with the Istio sidecar (2/2)**
+
+![k9s scaled pods](docs/screenshots/k9s-pods-scaled.png)
+
+**The HPA that KEDA manages for the app (2 to 6 replicas)**
+
+![k9s HPA](docs/screenshots/k9s-hpa.png)
+
 ## Local development
 
 ```sh

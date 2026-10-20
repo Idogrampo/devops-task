@@ -62,13 +62,13 @@ probes:
     path: /live
     initialDelaySeconds: 10
     periodSeconds: 10
-    timeoutSeconds: 2
+    timeoutSeconds: 5
     failureThreshold: 3
   readiness:
     path: /ready
     initialDelaySeconds: 5
     periodSeconds: 5
-    timeoutSeconds: 2
+    timeoutSeconds: 3
     failureThreshold: 3
   startup:
     path: /live
@@ -80,7 +80,7 @@ resources:
     cpu: 100m
     memory: 128Mi
   limits:
-    cpu: 250m
+    cpu: 500m
     memory: 256Mi
 
 # Scrape annotations for Prometheus

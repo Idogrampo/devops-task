@@ -696,7 +696,7 @@
     {
       "id": 16,
       "type": "timeseries",
-      "title": "Istio request latency p50 / p95 (KEDA trigger)",
+      "title": "Istio request latency p50 / p95 via gateway (KEDA trigger)",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -710,7 +710,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{reporter=\"destination\",destination_workload_namespace=\"devops-task\",destination_service_name=\"devops-task\"}[1m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{reporter=\"destination\",source_workload=\"istio-ingressgateway\",destination_workload_namespace=\"devops-task\",destination_service_name=\"devops-task\"}[1m])) by (le))",
           "legendFormat": "p95",
           "datasource": {
             "type": "prometheus",
@@ -719,7 +719,7 @@
         },
         {
           "refId": "B",
-          "expr": "histogram_quantile(0.50, sum(rate(istio_request_duration_milliseconds_bucket{reporter=\"destination\",destination_workload_namespace=\"devops-task\",destination_service_name=\"devops-task\"}[1m])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(istio_request_duration_milliseconds_bucket{reporter=\"destination\",source_workload=\"istio-ingressgateway\",destination_workload_namespace=\"devops-task\",destination_service_name=\"devops-task\"}[1m])) by (le))",
           "legendFormat": "p50",
           "datasource": {
             "type": "prometheus",
