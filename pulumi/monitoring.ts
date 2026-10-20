@@ -150,6 +150,8 @@ loki.write "local" {
             grafana: {
                 adminPassword: args.grafanaAdminPassword,
                 resources: { requests: { cpu: "50m", memory: "128Mi" }, limits: { memory: "384Mi" } },
+                // Alertmanager is disabled, so its default datasource would only show as broken
+                sidecar: { datasources: { alertmanager: { enabled: false } } },
                 additionalDataSources: [{
                     name: "Loki",
                     uid: "loki",

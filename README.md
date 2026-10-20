@@ -41,7 +41,7 @@ Installed by the same Pulumi stack, sized for a laptop (no Alertmanager, 6 h of 
 
 - **Metrics:** kube-prometheus-stack (Prometheus, Grafana, kube-state-metrics). The chart ships a `ServiceMonitor` (enabled by the ArgoCD `Application`), so Prometheus scrapes `/metrics` inside the cluster even though the gateway does not expose it.
 - **Logs:** Loki in single-binary mode, fed by Grafana Alloy, which tails every pod's logs through the Kubernetes API (no hostPath mounts, so it works on Docker Desktop).
-- **Dashboard:** `devops-task` in Grafana: ready replicas, request rate and total hits (`root_access_total`), CPU, memory, restarts, Node.js event loop lag, heap and GC, plus a live log panel. Grafana loads it from a ConfigMap labelled `grafana_dashboard=1`.
+- **Dashboard:** `devops-task` in Grafana: ready replicas, request rate and total hits (`root_access_total`), CPU, memory, restarts, Node.js event loop lag, heap and open file descriptors, plus a live log panel. Grafana loads it from a ConfigMap labelled `grafana_dashboard=1`.
 - **Access:** http://grafana.localhost (user `admin`, password `admin`, local only; override with `pulumi config set --secret grafanaAdminPassword ...`) and http://prometheus.localhost, both through the Istio gateway.
 
 ## CI/CD pipeline

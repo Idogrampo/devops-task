@@ -552,7 +552,7 @@
     {
       "id": 12,
       "type": "timeseries",
-      "title": "GC pause rate",
+      "title": "Open file descriptors",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -566,7 +566,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (pod) (rate(nodejs_gc_duration_seconds_sum{namespace=\"devops-task\"}[2m]))",
+          "expr": "process_open_fds{namespace=\"devops-task\"}",
           "legendFormat": "{{pod}}",
           "datasource": {
             "type": "prometheus",
@@ -576,7 +576,7 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s",
+          "unit": "short",
           "custom": {
             "fillOpacity": 10,
             "lineWidth": 1
