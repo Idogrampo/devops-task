@@ -2,6 +2,8 @@
 {{- if .Values.autoscaling.enabled }}
 {{- fail "keda.enabled and autoscaling.enabled are mutually exclusive: KEDA creates its own HPA" }}
 {{- end }}
+{{- $ns := .Release.Namespace }}
+{{- $server := .Values.keda.prometheus.serverAddress }}
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
@@ -15,10 +17,47 @@ spec:
   maxReplicaCount: {{ .Values.keda.maxReplicaCount }}
   pollingInterval: {{ .Values.keda.pollingInterval }}
   cooldownPeriod: {{ .Values.keda.cooldownPeriod }}
+  # The HPA behind this object follows whichever trigger asks for the most replicas
   triggers:
+    {{- with .Values.keda.cpu }}
+    {{- if .enabled }}
+    # Needs metrics-server. Measured on the app container only, so a sidecar does not skew it.
+    - type: cpu
+      metricType: Utilization
+      metadata:
+        value: {{ .utilization | quote }}
+        containerName: {{ $.Chart.Name }}
+    {{- end }}
+    {{- end }}
+    {{- with .Values.keda.memory }}
+    {{- if .enabled }}
+    - type: memory
+      metricType: Utilization
+      metadata:
+        value: {{ .utilization | quote }}
+        containerName: {{ $.Chart.Name }}
+    {{- end }}
+    {{- end }}
+    {{- with .Values.keda.requestRate }}
+    {{- if .enabled }}
+    # Total request rate, divided across replicas (AverageValue)
     - type: prometheus
       metadata:
-        serverAddress: {{ .Values.keda.prometheus.serverAddress | quote }}
-        query: {{ .Values.keda.prometheus.query | default (printf "sum(rate(root_access_total{namespace=%q}[1m]))" .Release.Namespace) | quote }}
-        threshold: {{ .Values.keda.prometheus.threshold | quote }}
+        serverAddress: {{ $server | quote }}
+        query: {{ .query | default (printf "sum(rate(root_access_total{namespace=%q}[1m]))" $ns) | quote }}
+        threshold: {{ .threshold | quote }}
+    {{- end }}
+    {{- end }}
+    {{- with .Values.keda.istioLatency }}
+    {{- if .enabled }}
+    # p95 latency measured by Istio's Envoy proxies. Latency does not add up across pods, so the
+    # raw value is compared to the threshold (metricType: Value). Needs the sidecar and the Envoy PodMonitor.
+    - type: prometheus
+      metricType: Value
+      metadata:
+        serverAddress: {{ $server | quote }}
+        query: {{ .query | default (printf "histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{reporter=%q,destination_workload_namespace=%q,destination_service_name=%q}[1m])) by (le)) > 0 or vector(0)" "destination" $ns (include "sample-nodejs.fullname" $)) | quote }}
+        threshold: {{ .thresholdMs | quote }}
+    {{- end }}
+    {{- end }}
 {{- end }}

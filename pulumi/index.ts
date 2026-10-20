@@ -110,7 +110,21 @@ const keda = new k8s.helm.v3.Release("keda", {
     timeout: 600,
 }, opts);
 
-const appNs = new k8s.core.v1.Namespace("app-ns", { metadata: { name: appNamespace } }, opts);
+// metrics-server: resource metrics for KEDA's cpu/memory triggers (and kubectl top / k9s).
+// Docker Desktop's kubelet serves a self-signed certificate, hence --kubelet-insecure-tls.
+const metricsServer = new k8s.helm.v3.Release("metrics-server", {
+    name: "metrics-server",
+    chart: "metrics-server",
+    version: "3.14.0",
+    repositoryOpts: { repo: "https://kubernetes-sigs.github.io/metrics-server/" },
+    namespace: "kube-system",
+    values: { args: ["--kubelet-insecure-tls"] },
+}, opts);
+
+// The label makes Istio inject the Envoy sidecar into the app pods, which is what emits request latency metrics
+const appNs = new k8s.core.v1.Namespace("app-ns", {
+    metadata: { name: appNamespace, labels: { "istio-injection": "enabled" } },
+}, opts);
 
 // Private Docker Hub only: lets ArgoCD pull the OCI chart and the kubelet pull the image
 const credDeps: pulumi.Resource[] = [];
@@ -165,7 +179,7 @@ const app = new k8s.apiextensions.CustomResource("devops-task-app", {
                     ...(dockerHubToken ? [`imagePullSecrets:\n  - name: regcred\n`] : []),
                     `virtualService:\n  hosts:\n    - ${appHost}\n`,
                     `monitoring:\n  serviceMonitor:\n    enabled: true\n`,
-                    `keda:\n  enabled: true\n`,
+                    `keda:\n  enabled: true\n  istioLatency:\n    enabled: true\n`,
                 ].join(""),
             },
         },
@@ -175,7 +189,7 @@ const app = new k8s.apiextensions.CustomResource("devops-task-app", {
             syncOptions: ["CreateNamespace=true"],
         },
     },
-}, { provider, dependsOn: [argocd, appNs, gateway, monitoring.stack, keda, ...credDeps] });
+}, { provider, dependsOn: [argocd, appNs, gateway, monitoring.stack, keda, metricsServer, ...credDeps] });
 
 export const appUrl = `http://${appHost}/my-app`;
 export const argocdPortForward = "kubectl --context docker-desktop -n argocd port-forward svc/argocd-server 8081:80";

@@ -94,8 +94,8 @@ monitoring:
     enabled: false
     interval: 15s
 
-# Event-driven autoscaling with KEDA: scales on the request rate Prometheus sees for this release.
-# Needs KEDA and Prometheus in the cluster; off by default. Use instead of autoscaling.enabled.
+# Event-driven autoscaling with KEDA. Off by default; use instead of autoscaling.enabled.
+# Each enabled trigger asks for a replica count and the largest one wins.
 keda:
   enabled: false
   minReplicaCount: 2
@@ -104,10 +104,23 @@ keda:
   cooldownPeriod: 60
   prometheus:
     serverAddress: http://kube-prometheus-stack-prometheus.monitoring.svc:9090
-    # Empty = total request rate for this release's namespace.
-    # KEDA keeps replicas at ceil(value / threshold)
+  # CPU and memory utilisation of the app container vs its requests (needs metrics-server)
+  cpu:
+    enabled: true
+    utilization: 80
+  memory:
+    enabled: true
+    utilization: 80
+  # Requests per second across the release, per replica (needs Prometheus scraping /metrics)
+  requestRate:
+    enabled: true
+    threshold: 5
+    query: ""   # empty = sum(rate(root_access_total{namespace=<release namespace>}[1m]))
+  # p95 latency in ms from Istio (needs the Istio sidecar and an Envoy PodMonitor)
+  istioLatency:
+    enabled: false
+    thresholdMs: 100
     query: ""
-    threshold: "5"
 
 autoscaling:
   enabled: false

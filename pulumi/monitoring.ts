@@ -176,6 +176,18 @@ loki.write "local" {
         },
     }, { provider, dependsOn: [stack] });
 
+    // Scrape the Envoy proxies (sidecars and the ingress gateway) for Istio's request metrics and latency histograms
+    const envoyMonitor = new k8s.apiextensions.CustomResource("istio-envoy-podmonitor", {
+        apiVersion: "monitoring.coreos.com/v1",
+        kind: "PodMonitor",
+        metadata: { name: "istio-envoy", namespace: NAMESPACE },
+        spec: {
+            namespaceSelector: { any: true },
+            selector: { matchExpressions: [{ key: "security.istio.io/tlsMode", operator: "Exists" }] },
+            podMetricsEndpoints: [{ port: "http-envoy-prom", path: "/stats/prometheus", interval: "15s" }],
+        },
+    }, { provider, dependsOn: [stack] });
+
     const route = (name: string, host: string, service: string, port: number) =>
         new k8s.apiextensions.CustomResource(`${name}-vs`, {
             apiVersion: "networking.istio.io/v1",
@@ -191,5 +203,5 @@ loki.write "local" {
     const grafanaRoute = route("grafana", args.grafanaHost, "kube-prometheus-stack-grafana", 80);
     const prometheusRoute = route("prometheus", args.prometheusHost, "kube-prometheus-stack-prometheus", 9090);
 
-    return { stack, loki, alloy, dashboard, routes: [grafanaRoute, prometheusRoute] };
+    return { stack, loki, alloy, dashboard, envoyMonitor, routes: [grafanaRoute, prometheusRoute] };
 }
