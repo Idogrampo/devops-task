@@ -1,0 +1,24 @@
+{{- if .Values.virtualService.enabled }}
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: {{ include "sample-nodejs.fullname" . }}
+  labels:
+    {{- include "sample-nodejs.labels" . | nindent 4 }}
+spec:
+  hosts:
+    {{- toYaml .Values.virtualService.hosts | nindent 4 }}
+  gateways:
+    {{- toYaml .Values.virtualService.gateways | nindent 4 }}
+  http:
+    - match:
+        {{- range .Values.virtualService.paths }}
+        - uri:
+            prefix: {{ . }}
+        {{- end }}
+      route:
+        - destination:
+            host: {{ include "sample-nodejs.fullname" . }}
+            port:
+              number: {{ .Values.service.port }}
+{{- end }}

@@ -31,9 +31,21 @@ service:
   type: ClusterIP
   port: 80
 
+# Default entrypoint: an Istio VirtualService bound to a platform-owned Gateway.
 # Only the public app routes are exposed; /metrics and /classified stay cluster-internal.
-ingress:
+virtualService:
   enabled: true
+  gateways:
+    - istio-ingress/devops-gateway
+  hosts:
+    - devops-task.localhost
+  paths:
+    - /my-app
+    - /about
+
+# Alternative for clusters without Istio (off by default)
+ingress:
+  enabled: false
   className: nginx
   annotations: {}
   hosts:

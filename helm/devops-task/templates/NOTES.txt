@@ -1,4 +1,8 @@
-{{- if .Values.ingress.enabled }}
+{{- if .Values.virtualService.enabled }}
+{{- range .Values.virtualService.hosts }}
+App: http://{{ . }}{{ index $.Values.virtualService.paths 0 }}
+{{- end }}
+{{- else if .Values.ingress.enabled }}
 {{- range .Values.ingress.hosts }}
 App: http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}{{ (index .paths 0).path }}
 {{- end }}

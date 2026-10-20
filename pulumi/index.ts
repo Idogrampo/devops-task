@@ -5,12 +5,14 @@ const config = new pulumi.Config();
 const kubeContext = config.require("kubeContext");
 const appNamespace = config.require("appNamespace");
 const dockerHubUser = config.require("dockerHubUser");
-const dockerHubToken = config.requireSecret("dockerHubToken");
+// Optional: only needed if the Docker Hub repos are private
+const dockerHubToken = config.getSecret("dockerHubToken");
 const imageRepo = config.require("imageRepo");
 const chartRepo = config.require("chartRepo");
 const chartName = config.require("chartName");
 const chartVersion = config.require("chartVersion");
-const ingressHost = config.require("ingressHost");
+const appHost = config.require("appHost");
+const istioVersion = config.require("istioVersion");
 
 // Never fall back to the shell's current kubectl context (those are company EKS clusters).
 if (kubeContext !== "docker-desktop") {
@@ -19,14 +21,49 @@ if (kubeContext !== "docker-desktop") {
 const provider = new k8s.Provider("local", { context: kubeContext });
 const opts = { provider };
 
-// Ingress controller: on Docker Desktop its LoadBalancer is published on localhost:80
-const ingressNginx = new k8s.helm.v3.Release("ingress-nginx", {
-    name: "ingress-nginx",
-    chart: "ingress-nginx",
-    repositoryOpts: { repo: "https://kubernetes.github.io/ingress-nginx" },
-    namespace: "ingress-nginx",
+// Istio: CRDs -> control plane -> ingress gateway. On Docker Desktop the gateway's
+// LoadBalancer Service is published on localhost:80.
+const istioRepo = { repo: "https://istio-release.storage.googleapis.com/charts" };
+const istioBase = new k8s.helm.v3.Release("istio-base", {
+    name: "istio-base",
+    chart: "base",
+    version: istioVersion,
+    repositoryOpts: istioRepo,
+    namespace: "istio-system",
     createNamespace: true,
 }, opts);
+const istiod = new k8s.helm.v3.Release("istiod", {
+    name: "istiod",
+    chart: "istiod",
+    version: istioVersion,
+    repositoryOpts: istioRepo,
+    namespace: "istio-system",
+    // Local single-node cluster: keep the control plane small
+    values: { pilot: { resources: { requests: { cpu: "100m", memory: "256Mi" } } } },
+}, { provider, dependsOn: [istioBase] });
+const istioGateway = new k8s.helm.v3.Release("istio-ingressgateway", {
+    name: "istio-ingressgateway",
+    chart: "gateway",
+    version: istioVersion,
+    repositoryOpts: istioRepo,
+    namespace: "istio-ingress",
+    createNamespace: true,
+    values: {
+        labels: { istio: "ingressgateway" },
+        service: { type: "LoadBalancer" },
+    },
+}, { provider, dependsOn: [istiod] });
+
+// Platform-owned Gateway; the app chart's VirtualService attaches to it as istio-ingress/devops-gateway
+const gateway = new k8s.apiextensions.CustomResource("devops-gateway", {
+    apiVersion: "networking.istio.io/v1",
+    kind: "Gateway",
+    metadata: { name: "devops-gateway", namespace: "istio-ingress" },
+    spec: {
+        selector: { istio: "ingressgateway" },
+        servers: [{ port: { number: 80, name: "http", protocol: "HTTP" }, hosts: ["*"] }],
+    },
+}, { provider, dependsOn: [istioGateway] });
 
 const argocd = new k8s.helm.v3.Release("argocd", {
     name: "argocd",
@@ -42,30 +79,30 @@ const argocd = new k8s.helm.v3.Release("argocd", {
 
 const appNs = new k8s.core.v1.Namespace("app-ns", { metadata: { name: appNamespace } }, opts);
 
-// Lets ArgoCD pull the (private) Helm chart from Docker Hub as an OCI artifact
-const argoRepo = new k8s.core.v1.Secret("argocd-dockerhub-repo", {
-    metadata: {
-        name: "dockerhub-oci",
-        namespace: "argocd",
-        labels: { "argocd.argoproj.io/secret-type": "repository" },
-    },
-    stringData: {
-        type: "helm",
-        name: "dockerhub",
-        url: chartRepo,
-        enableOCI: "true",
-        username: dockerHubUser,
-        password: dockerHubToken,
-    },
-}, { provider, dependsOn: [argocd] });
+// Private Docker Hub only: lets ArgoCD pull the OCI chart and the kubelet pull the image
+const credDeps: pulumi.Resource[] = [];
+if (dockerHubToken) {
+    credDeps.push(new k8s.core.v1.Secret("argocd-dockerhub-repo", {
+        metadata: {
+            name: "dockerhub-oci",
+            namespace: "argocd",
+            labels: { "argocd.argoproj.io/secret-type": "repository" },
+        },
+        stringData: {
+            type: "helm",
+            name: "dockerhub",
+            url: chartRepo,
+            enableOCI: "true",
+            username: dockerHubUser,
+            password: dockerHubToken,
+        },
+    }, { provider, dependsOn: [argocd] }));
 
-// Lets the kubelet pull the private image
-const pullSecret = new k8s.core.v1.Secret("regcred", {
-    metadata: { name: "regcred", namespace: appNamespace },
-    type: "kubernetes.io/dockerconfigjson",
-    stringData: {
-        ".dockerconfigjson": pulumi.secret(pulumi.all([dockerHubToken]).apply(([t]) =>
-            JSON.stringify({
+    credDeps.push(new k8s.core.v1.Secret("regcred", {
+        metadata: { name: "regcred", namespace: appNamespace },
+        type: "kubernetes.io/dockerconfigjson",
+        stringData: {
+            ".dockerconfigjson": dockerHubToken.apply(t => JSON.stringify({
                 auths: {
                     "https://index.docker.io/v1/": {
                         username: dockerHubUser,
@@ -73,9 +110,10 @@ const pullSecret = new k8s.core.v1.Secret("regcred", {
                         auth: Buffer.from(`${dockerHubUser}:${t}`).toString("base64"),
                     },
                 },
-            }))),
-    },
-}, { provider, dependsOn: [appNs] });
+            })),
+        },
+    }, { provider, dependsOn: [appNs] }));
+}
 
 // GitOps: Pulumi only declares the ArgoCD Application; ArgoCD does every deploy from here on.
 const app = new k8s.apiextensions.CustomResource("devops-task-app", {
@@ -91,8 +129,8 @@ const app = new k8s.apiextensions.CustomResource("devops-task-app", {
             helm: {
                 values: [
                     `image:\n  repository: ${imageRepo}\n`,
-                    `imagePullSecrets:\n  - name: regcred\n`,
-                    `ingress:\n  hosts:\n    - host: ${ingressHost}\n      paths:\n        - path: /my-app\n          pathType: Prefix\n        - path: /about\n          pathType: Prefix\n`,
+                    ...(dockerHubToken ? [`imagePullSecrets:\n  - name: regcred\n`] : []),
+                    `virtualService:\n  hosts:\n    - ${appHost}\n`,
                 ].join(""),
             },
         },
@@ -102,9 +140,9 @@ const app = new k8s.apiextensions.CustomResource("devops-task-app", {
             syncOptions: ["CreateNamespace=true"],
         },
     },
-}, { provider, dependsOn: [argocd, argoRepo, pullSecret, ingressNginx] });
+}, { provider, dependsOn: [argocd, appNs, gateway, ...credDeps] });
 
-export const appUrl = `http://${ingressHost}/my-app`;
+export const appUrl = `http://${appHost}/my-app`;
 export const argocdPortForward = "kubectl --context docker-desktop -n argocd port-forward svc/argocd-server 8081:80";
 export const argocdAdminPassword = "kubectl --context docker-desktop -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d";
 export const applicationName = app.metadata.name;
