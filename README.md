@@ -76,6 +76,47 @@ When it finishes:
 
 The first run pulls a lot of images and takes several minutes. The gateway uses `localhost:80`, so that port must be free. The Docker Hub repository is public. If you use a private one, export `DOCKER_HUB_TOKEN` before running the script and it creates the ArgoCD repository credential and the image pull secret.
 
+## Access (local cluster)
+
+| Service | URL | Login |
+|---|---|---|
+| App | http://devops-task.localhost/my-app | none |
+| App, about page | http://devops-task.localhost/about | none |
+| ArgoCD | http://argocd.localhost | `admin` / initial admin secret, see below |
+| Grafana | http://grafana.localhost | `admin` / `admin` |
+| Prometheus | http://prometheus.localhost | none |
+| Repository | https://github.com/Idogrampo/devops-task | |
+| CI/CD runs | https://github.com/Idogrampo/devops-task/actions | |
+| Docker Hub (image and chart) | https://hub.docker.com/r/grampo/devops-task | |
+
+The ArgoCD password is generated per cluster. `bootstrap.sh` prints it, or read it with:
+
+```sh
+kubectl --context docker-desktop -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
+```
+
+The Grafana password is a local-only default; override it with `pulumi config set --secret grafanaAdminPassword <value>`. `/metrics`, `/classified`, `/ready` and `/live` are deliberately not routed by the gateway (404 from outside the cluster).
+
+**Logs:** the dashboard has a live log panel. For ad-hoc queries, open Grafana, then Explore, pick the **Loki** datasource and run `{namespace="devops-task"}`, or `{namespace="devops-task"} | json | path="/my-app"` to filter the JSON access log.
+
+## Screenshots
+
+**CI/CD notification in Slack**
+
+![Slack notification](docs/screenshots/slack.png)
+
+**ArgoCD: application synced and healthy**
+
+![ArgoCD application](docs/screenshots/argocd.png)
+
+**Grafana: `devops-task` dashboard**
+
+![Grafana dashboard](docs/screenshots/grafana-dashboard.png)
+
+**Prometheus**
+
+![Prometheus query](docs/screenshots/prometheus.png)
+
 ## Local development
 
 ```sh
