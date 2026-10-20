@@ -1,0 +1,135 @@
+
+name: Send Slack Notification
+description: with a nice colors and images
+inputs:
+  message:
+    description: 'message'
+    required: true
+  environment:
+    description: 'environment for deploy'
+    required: true
+  service_name:
+    description: 'service name'
+    required: false
+    default: aura-ml-apps
+  slack_webhook:
+    description: 'Slack incoming webhook URL (the webhook is bound to its channel)'
+    required: true
+  status:
+    description: 'success or failure; defaults to the calling job status. Pass it explicitly from a notify job that needs other jobs results'
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Set Workflow Status
+      id: check_status
+      shell: bash
+      env:
+        STATUS: ${{ inputs.status || job.status }}
+      run: |
+        if [ "$STATUS" == 'success' ]; then
+          echo "slack_message_status=SUCCESS :shark: :king:" >> $GITHUB_OUTPUT
+          echo "slack_message_color=00FF00" >> $GITHUB_OUTPUT
+        else
+          echo "slack_message_status=FAILURE :fail: :eifoo:" >> $GITHUB_OUTPUT
+          echo "slack_message_color=FF0000" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Send Slack notification
+      uses: slackapi/slack-github-action@v1.26.0
+      env:
+        SLACK_WEBHOOK_URL: ${{ inputs.slack_webhook }}
+        SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+      with:
+        payload: |
+          {
+            "attachments": [
+              {
+                "color": "${{ steps.check_status.outputs.slack_message_color }}",
+                "blocks": [
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "${{ inputs.message }}"
+                    },
+                    "accessory": {
+                      "type": "image",
+                      "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTkQXpiHjR6qfjdTY2epGGQgU2hi_DIxzCgjwiSu5VtHmdiTFJHrqwu1jAOIbcK8C-66T8&usqp=CAU",
+                      "alt_text": "cute cat"
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "plain_text",
+                      "text": "${{ github.workflow }} - ${{ steps.check_status.outputs.slack_message_status }}",
+                      "emoji": true
+                    }
+                  },
+                  {
+                    "type": "section",
+                    "fields": [
+                      {
+                        "type": "plain_text",
+                        "text": "Service:",
+                        "emoji": true
+                      },
+                      {
+                        "type": "plain_text",
+                        "text": "${{ inputs.service_name }}",
+                        "emoji": true
+                      },
+                      {
+                        "type": "plain_text",
+                        "text": "environment:",
+                        "emoji": true
+                      },
+                      {
+                        "type": "plain_text",
+                        "text": " ${{ inputs.environment }}",
+                        "emoji": true
+                      },
+                      {
+                        "type": "plain_text",
+                        "text": "branch:",
+                        "emoji": true
+                      },
+                      {
+                        "type": "plain_text",
+                        "text": " ${{ github.ref_name }}",
+                        "emoji": true
+                      }
+                    ]
+                  },
+                  {
+                    "type": "section",
+                    "text": {
+                      "type": "mrkdwn",
+                      "text": "developer: ${{github.event.sender.login}}\n${{ inputs.message }}"
+                    },
+                    "accessory": {
+                      "type": "image",
+                      "image_url": "${{ github.event.sender.avatar_url }}",
+                      "alt_text": "cute cat"
+                    }
+                  },
+                  {
+                    "type": "actions",
+                    "elements": [
+                      {
+                        "type": "button",
+                        "text": {
+                          "type": "plain_text",
+                          "text": "Link To JOB Run"
+                        },
+                        "url": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }

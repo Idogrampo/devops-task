@@ -1,0 +1,103 @@
+replicaCount: 2
+
+image:
+  repository: grampo/devops-task
+  tag: ""            # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+
+# App listens on $PORT (default 8080)
+containerPort: 8080
+
+# Non-sensitive env vars, rendered into a ConfigMap
+config:
+  NODE_ENV: production
+
+# Sensitive env vars, rendered into a Secret (the app needs none today).
+# Prefer existingSecret in real environments.
+secret:
+  existingSecret: ""
+  data: {}
+
+service:
+  type: ClusterIP
+  port: 80
+
+# Only the public app routes are exposed; /metrics and /classified stay cluster-internal.
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: devops-task.localhost
+      paths:
+        - path: /my-app
+          pathType: Prefix
+        - path: /about
+          pathType: Prefix
+  tls: []
+
+probes:
+  liveness:
+    path: /live
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+  readiness:
+    path: /ready
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 2
+    failureThreshold: 3
+  startup:
+    path: /live
+    periodSeconds: 3
+    failureThreshold: 20
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+# Scrape annotations for Prometheus
+metrics:
+  scrape: true
+  path: /metrics
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+podAnnotations: {}
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

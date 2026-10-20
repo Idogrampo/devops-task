@@ -1,0 +1,6 @@
+name: devops-task-local
+description: ArgoCD + ingress-nginx + the devops-task app on the local docker-desktop cluster
+runtime: nodejs
+
+backend:
+  url: file://~/.pulumi-local

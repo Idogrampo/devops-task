@@ -1,0 +1,11 @@
+config:
+  devops-task-local:kubeContext: docker-desktop
+  devops-task-local:appNamespace: devops-task
+  devops-task-local:dockerHubUser: grampo
+  devops-task-local:imageRepo: grampo/devops-task
+  devops-task-local:chartRepo: registry-1.docker.io/grampo
+  devops-task-local:chartName: devops-task
+  # Semver constraint: ArgoCD follows the newest chart CI pushes. Pin to e.g. 1.0.3 to freeze.
+  devops-task-local:chartVersion: ">=0.0.1"
+  devops-task-local:ingressHost: devops-task.localhost
+  # Also required, set with: pulumi config set --secret dockerHubToken <token>

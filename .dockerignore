@@ -1,0 +1,8 @@
+node_modules
+.git
+.github
+helm
+pulumi
+actions
+Dockerfile
+README.md

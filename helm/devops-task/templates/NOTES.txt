@@ -1,0 +1,8 @@
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+App: http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}{{ (index .paths 0).path }}
+{{- end }}
+{{- else }}
+kubectl port-forward svc/{{ include "sample-nodejs.fullname" . }} 8080:{{ .Values.service.port }}
+then open http://127.0.0.1:8080/my-app
+{{- end }}
