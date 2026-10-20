@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-shot setup for a machine that only has Docker Desktop with Kubernetes enabled.
-# Installs missing tooling, then runs the Pulumi stack, which deploys Istio, ArgoCD, the monitoring
+# Installs missing tooling, then runs the Pulumi stack, which deploys Istio, ArgoCD, KEDA, metrics-server, the monitoring
 # stack (Prometheus, Grafana, Loki) and the app.
 #
 #   ./scripts/bootstrap.sh              install tooling, deploy, wait until the app answers
@@ -90,7 +90,7 @@ if [ "$DRY_RUN" = 1 ]; then
   pulumi preview --non-interactive
   exit 0
 fi
-log "Deploying Istio, ArgoCD, monitoring and the app (first run takes several minutes)"
+log "Deploying Istio, ArgoCD, KEDA, metrics-server, monitoring and the app (first run takes several minutes)"
 pulumi up --yes --non-interactive --skip-preview
 
 log "Waiting for ArgoCD to sync and the app to become healthy"
@@ -102,6 +102,19 @@ for i in $(seq 1 90); do
   sleep 10
 done
 [ "$health" = Healthy ] || die "app did not become healthy; inspect: kubectl --context $CTX -n argocd describe application devops-task"
+
+log "Waiting for KEDA autoscaling (ScaledObject ready, HPA created)"
+ready=""
+for i in $(seq 1 24); do
+  ready=$(kubectl --context "$CTX" -n devops-task get scaledobject devops-task -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)
+  [ "$ready" = True ] && break
+  sleep 5
+done
+if [ "$ready" = True ]; then
+  kubectl --context "$CTX" -n devops-task get hpa --no-headers 2>/dev/null | awk '{print "  hpa: " $1 "  replicas " $(NF-1) "  (min " $(NF-3) ", max " $(NF-2) ")"}' || true
+else
+  echo "  warning: ScaledObject not ready yet; check: kubectl --context $CTX -n keda get pods"
+fi
 
 log "Checking http://$HOST/my-app through the Istio gateway"
 for i in $(seq 1 30); do
