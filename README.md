@@ -71,7 +71,8 @@ Prerequisite: Docker Desktop with Kubernetes enabled. Nothing else is needed; th
 When it finishes:
 
 - App: http://devops-task.localhost/my-app
-- ArgoCD: `kubectl --context docker-desktop -n argocd port-forward svc/argocd-server 8081:80`, then http://localhost:8081 (user `admin`, password printed by the script)
+- ArgoCD: http://argocd.localhost (user `admin`, password printed by the script)
+- Grafana: http://grafana.localhost (user `admin`, password `admin`) and Prometheus: http://prometheus.localhost
 
 The first run pulls a lot of images and takes several minutes. The gateway uses `localhost:80`, so that port must be free. The Docker Hub repository is public. If you use a private one, export `DOCKER_HUB_TOKEN` before running the script and it creates the ArgoCD repository credential and the image pull secret.
 

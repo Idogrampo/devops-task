@@ -128,6 +128,5 @@ Done.
   App:     http://$HOST/my-app
   Grafana: http://$GRAFANA_HOST   user: admin   password: admin   (dashboard: "devops-task")
   Prometheus: http://prometheus.localhost
-  ArgoCD:  kubectl --context $CTX -n argocd port-forward svc/argocd-server 8081:80   ->  http://localhost:8081
-           user: admin   password: $pw
+  ArgoCD:  http://argocd.localhost   user: admin   password: $pw
 MSG

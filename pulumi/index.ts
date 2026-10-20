@@ -16,6 +16,7 @@ const appHost = config.require("appHost");
 const istioVersion = config.require("istioVersion");
 const grafanaHost = config.require("grafanaHost");
 const prometheusHost = config.require("prometheusHost");
+const argocdHost = config.require("argocdHost");
 // Local-only default; override with: pulumi config set --secret grafanaAdminPassword <value>
 const grafanaAdminPassword = config.get("grafanaAdminPassword") ?? "admin";
 
@@ -84,6 +85,18 @@ const argocd = new k8s.helm.v3.Release("argocd", {
 
 // Prometheus + Grafana + Loki. Installed before the app so the ServiceMonitor CRD exists when ArgoCD syncs.
 const monitoring = createMonitoring({ provider, gateway, grafanaHost, prometheusHost, grafanaAdminPassword });
+
+// ArgoCD UI through the same gateway (the server runs with server.insecure, i.e. plain HTTP)
+new k8s.apiextensions.CustomResource("argocd-vs", {
+    apiVersion: "networking.istio.io/v1",
+    kind: "VirtualService",
+    metadata: { name: "argocd", namespace: "argocd" },
+    spec: {
+        hosts: [argocdHost],
+        gateways: ["istio-ingress/devops-gateway"],
+        http: [{ route: [{ destination: { host: "argocd-server.argocd.svc.cluster.local", port: { number: 80 } } }] }],
+    },
+}, { provider, dependsOn: [argocd, gateway] });
 
 const appNs = new k8s.core.v1.Namespace("app-ns", { metadata: { name: appNamespace } }, opts);
 
@@ -154,6 +167,7 @@ const app = new k8s.apiextensions.CustomResource("devops-task-app", {
 export const appUrl = `http://${appHost}/my-app`;
 export const argocdPortForward = "kubectl --context docker-desktop -n argocd port-forward svc/argocd-server 8081:80";
 export const argocdAdminPassword = "kubectl --context docker-desktop -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d";
+export const argocdUrl = `http://${argocdHost}`;
 export const grafanaUrl = `http://${grafanaHost}`;
 export const prometheusUrl = `http://${prometheusHost}`;
 export const applicationName = app.metadata.name;
