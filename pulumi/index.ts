@@ -98,6 +98,18 @@ new k8s.apiextensions.CustomResource("argocd-vs", {
     },
 }, { provider, dependsOn: [argocd, gateway] });
 
+// KEDA: event-driven autoscaling; the app chart's ScaledObject scales on a Prometheus query.
+// Installed before the Application so the ScaledObject CRD exists when ArgoCD syncs.
+const keda = new k8s.helm.v3.Release("keda", {
+    name: "keda",
+    chart: "keda",
+    version: "2.21.0",
+    repositoryOpts: { repo: "https://kedacore.github.io/charts" },
+    namespace: "keda",
+    createNamespace: true,
+    timeout: 600,
+}, opts);
+
 const appNs = new k8s.core.v1.Namespace("app-ns", { metadata: { name: appNamespace } }, opts);
 
 // Private Docker Hub only: lets ArgoCD pull the OCI chart and the kubelet pull the image
@@ -153,6 +165,7 @@ const app = new k8s.apiextensions.CustomResource("devops-task-app", {
                     ...(dockerHubToken ? [`imagePullSecrets:\n  - name: regcred\n`] : []),
                     `virtualService:\n  hosts:\n    - ${appHost}\n`,
                     `monitoring:\n  serviceMonitor:\n    enabled: true\n`,
+                    `keda:\n  enabled: true\n`,
                 ].join(""),
             },
         },
@@ -162,7 +175,7 @@ const app = new k8s.apiextensions.CustomResource("devops-task-app", {
             syncOptions: ["CreateNamespace=true"],
         },
     },
-}, { provider, dependsOn: [argocd, appNs, gateway, monitoring.stack, ...credDeps] });
+}, { provider, dependsOn: [argocd, appNs, gateway, monitoring.stack, keda, ...credDeps] });
 
 export const appUrl = `http://${appHost}/my-app`;
 export const argocdPortForward = "kubectl --context docker-desktop -n argocd port-forward svc/argocd-server 8081:80";

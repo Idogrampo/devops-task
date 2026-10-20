@@ -1,0 +1,24 @@
+{{- if .Values.keda.enabled }}
+{{- if .Values.autoscaling.enabled }}
+{{- fail "keda.enabled and autoscaling.enabled are mutually exclusive: KEDA creates its own HPA" }}
+{{- end }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "sample-nodejs.fullname" . }}
+  labels:
+    {{- include "sample-nodejs.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    name: {{ include "sample-nodejs.fullname" . }}
+  minReplicaCount: {{ .Values.keda.minReplicaCount }}
+  maxReplicaCount: {{ .Values.keda.maxReplicaCount }}
+  pollingInterval: {{ .Values.keda.pollingInterval }}
+  cooldownPeriod: {{ .Values.keda.cooldownPeriod }}
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: {{ .Values.keda.prometheus.serverAddress | quote }}
+        query: {{ .Values.keda.prometheus.query | default (printf "sum(rate(root_access_total{namespace=%q}[1m]))" .Release.Namespace) | quote }}
+        threshold: {{ .Values.keda.prometheus.threshold | quote }}
+{{- end }}

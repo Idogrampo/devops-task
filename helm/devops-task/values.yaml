@@ -94,6 +94,21 @@ monitoring:
     enabled: false
     interval: 15s
 
+# Event-driven autoscaling with KEDA: scales on the request rate Prometheus sees for this release.
+# Needs KEDA and Prometheus in the cluster; off by default. Use instead of autoscaling.enabled.
+keda:
+  enabled: false
+  minReplicaCount: 2
+  maxReplicaCount: 6
+  pollingInterval: 15
+  cooldownPeriod: 60
+  prometheus:
+    serverAddress: http://kube-prometheus-stack-prometheus.monitoring.svc:9090
+    # Empty = total request rate for this release's namespace.
+    # KEDA keeps replicas at ceil(value / threshold)
+    query: ""
+    threshold: "5"
+
 autoscaling:
   enabled: false
   minReplicas: 2
