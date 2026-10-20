@@ -123,6 +123,14 @@ The Grafana password is a local-only default; override it with `pulumi config se
 
 ## Screenshots
 
+**The app through the Istio gateway: `/my-app`**
+
+![App /my-app](docs/screenshots/app-my-app.png)
+
+**The app through the Istio gateway: `/about`**
+
+![App /about](docs/screenshots/app-about.png)
+
 **CI/CD notification in Slack**
 
 ![Slack notification](docs/screenshots/slack.png)
