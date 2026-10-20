@@ -60,3 +60,23 @@ test('/about does not touch the counter', async () => {
     await fetch(url('/about'));
     assert.strictEqual(await read(), before);
 });
+
+test('requests are logged as JSON lines, probes are not', async () => {
+    const lines = [];
+    const logged = spawn('node', ['app.js'], { env: { ...process.env, PORT: String(port + 1) }, stdio: ['ignore', 'pipe', 'ignore'] });
+    logged.stdout.on('data', (d) => lines.push(...d.toString().split('\n').filter(Boolean)));
+    try {
+        const base = `http://127.0.0.1:${port + 1}`;
+        for (let i = 0; i < 50; i++) {
+            try { await fetch(`${base}/live`); break; } catch { await new Promise(r => setTimeout(r, 100)); }
+        }
+        await fetch(`${base}/my-app`);
+        await fetch(`${base}/ready`);
+        await new Promise(r => setTimeout(r, 200));
+        const entries = lines.filter(l => l.startsWith('{')).map(l => JSON.parse(l));
+        assert.deepStrictEqual(entries.map(e => e.path), ['/my-app']);
+        assert.strictEqual(entries[0].status, 200);
+    } finally {
+        logged.kill();
+    }
+});

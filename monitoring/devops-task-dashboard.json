@@ -292,7 +292,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(container_memory_working_set_bytes{namespace=\"devops-task\",container=\"devops-task\"})",
+          "expr": "sum(container_memory_working_set_bytes{namespace=\"devops-task\"})",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -386,7 +386,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"devops-task\",container=\"devops-task\"}[2m]))",
+          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"devops-task\"}[2m]))",
           "legendFormat": "{{pod}}",
           "datasource": {
             "type": "prometheus",
@@ -431,7 +431,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"devops-task\",container=\"devops-task\"})",
+          "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"devops-task\"})",
           "legendFormat": "{{pod}}",
           "datasource": {
             "type": "prometheus",

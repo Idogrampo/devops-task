@@ -49,6 +49,9 @@ export function createMonitoring(args: MonitoringArgs) {
             singleBinary: {
                 replicas: 1,
                 persistence: { enabled: false },
+                // Without a PVC the chart mounts nothing at /var/loki and the root filesystem is read-only
+                extraVolumes: [{ name: "loki-data", emptyDir: {} }],
+                extraVolumeMounts: [{ name: "loki-data", mountPath: "/var/loki" }],
                 resources: { requests: { cpu: "100m", memory: "256Mi" }, limits: { memory: "512Mi" } },
             },
             // Single-binary mode: switch off the scalable components, caches and test pods

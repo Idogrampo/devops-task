@@ -18,6 +18,17 @@ register.registerMetric(helloWorldCounter);
 
 
 
+// One JSON line per request, skipping probe and scrape noise
+app.use((req, res, next) => {
+    const start = process.hrtime.bigint();
+    res.on('finish', () => {
+        if (['/ready', '/live', '/metrics'].includes(req.path)) return;
+        const ms = Number(process.hrtime.bigint() - start) / 1e6;
+        console.log(JSON.stringify({ level: 'info', method: req.method, path: req.path, status: res.statusCode, ms: Math.round(ms * 10) / 10 }));
+    });
+    next();
+});
+
 // Define routes
 app.get('/my-app', (req, res) => {
     helloWorldCounter.inc();
