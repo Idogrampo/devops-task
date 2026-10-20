@@ -122,6 +122,18 @@ The Grafana password is a local-only default; override it with `pulumi config se
 
 ![Prometheus query](docs/screenshots/prometheus.png)
 
+**Cluster after a fresh `bootstrap.sh` (k9s): namespaces**
+
+![k9s namespaces](docs/screenshots/k9s-namespaces.png)
+
+**k9s: app pods in `devops-task`**
+
+![k9s pods](docs/screenshots/k9s-pods.png)
+
+**k9s: Istio VirtualServices for the app, ArgoCD, Grafana and Prometheus**
+
+![k9s virtualservices](docs/screenshots/k9s-virtualservices.png)
+
 ## Local development
 
 ```sh
