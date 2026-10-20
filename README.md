@@ -114,6 +114,10 @@ The Grafana password is a local-only default; override it with `pulumi config se
 
 ![Slack notification](docs/screenshots/slack.png)
 
+**Slack message for a change that needs no build (checks pass, nothing is released)**
+
+![Slack, nothing to release](docs/screenshots/slack-no-release.png)
+
 **ArgoCD: application synced and healthy**
 
 ![ArgoCD application](docs/screenshots/argocd.png)
